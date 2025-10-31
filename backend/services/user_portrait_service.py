@@ -370,12 +370,18 @@ class UserPortraitFlowService:
         ).first()
         
         if user_portrait:
+            user_portrait.basic_info = basic_info
+            user_portrait.health_history = health_history
+            user_portrait.lifestyle = lifestyle
             user_portrait.health_risk = health_risk
             user_portrait.recommended_frequency = recommended_frequency
             user_portrait.generated_at = datetime.now()
         else:
             user_portrait = UserPortrait(
                 user_id=self.user_id,
+                basic_info=basic_info,
+                health_history=health_history,
+                lifestyle=lifestyle,
                 health_risk=health_risk,
                 recommended_frequency=recommended_frequency,
                 generated_at=datetime.now()

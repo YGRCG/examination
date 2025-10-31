@@ -154,8 +154,12 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { router } from '../router'
+import { useRouter, useRoute } from 'vue-router'
 import { login, register } from '../api/auth'
+
+// 获取路由实例
+const router = useRouter()
+const route = useRoute()
 
 // 状态管理
 const isLoginMode = ref(true)
@@ -243,9 +247,12 @@ const handleLogin = async () => {
         localStorage.removeItem('rememberedUsername')
       }
       
-      // 登录成功后跳转到信息收集页面
+      // 登录成功后跳转
       console.log('正在执行跳转...')
-      router.replace('/information')
+      
+      // 检查是否有重定向参数
+      const redirectPath = route.query.redirect || '/smart-interaction'
+      router.replace(redirectPath)
       console.log('跳转完成')
     } else {
       errorMessage.value = '登录失败，请重试'

@@ -13,7 +13,7 @@ const app = createApp(App)
 const pinia = createPinia()
 
 // 配置axios全局默认值
-axios.defaults.baseURL = '/api'
+axios.defaults.baseURL = 'http://localhost:8000'
 axios.defaults.timeout = 10000
 
 // 请求拦截器 - 添加token

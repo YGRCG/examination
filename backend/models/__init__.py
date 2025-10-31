@@ -12,7 +12,8 @@ from .examination import (
     ExaminationItem, 
     UserExaminationItem, 
     ExaminationRecord, 
-    ExaminationResult
+    ExaminationResult,
+    ExaminationPackage
 )
 
 # 导入健康相关模型
@@ -59,6 +60,7 @@ __all__ = [
     "UserExaminationItem",
     "ExaminationRecord",
     "ExaminationResult",
+    "ExaminationPackage",
     
     # 健康相关模型
     "HealthInfo",

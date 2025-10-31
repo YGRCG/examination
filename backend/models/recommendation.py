@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float, JSON, text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -20,14 +20,19 @@ class Recommendation(Base):
     
     id = Column(Integer, primary_key=True, index=True, comment="推荐ID")
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="用户ID")
-    based_on_record_id = Column(Integer, ForeignKey("examination_records.id"), nullable=True, comment="基于的体检记录ID")
-    recommended_items = Column(JSON, nullable=False, comment="推荐项目列表")
-    reason = Column(String(1000), nullable=True, comment="推荐理由")
-    created_at = Column(DateTime, default=get_current_time, comment="创建时间")
-    updated_at = Column(DateTime, default=get_current_time, onupdate=get_current_time, comment="更新时间")
+    portraits_id = Column(Integer, ForeignKey("user_portraits.id"), nullable=False, comment="用户画像ID")
+    recommended_package_id = Column(Integer, ForeignKey("examination_packages.id"), nullable=False, comment="推荐套餐ID")
+    recommendation_reason = Column(String(1000), nullable=True, comment="推荐理由")
+    recommended_at = Column(DateTime, server_default=text('CURRENT_TIMESTAMP'), nullable=True, comment="推荐时间")
+    created_at = Column(DateTime, server_default=text('CURRENT_TIMESTAMP'), nullable=True, comment="创建时间")
+    updated_at = Column(DateTime, server_default=text('CURRENT_TIMESTAMP'), nullable=True, comment="更新时间")
     
     # 关系：与用户表的多对一关系
     user = relationship("User", back_populates="recommendations")
+    # 关系：与用户画像表的多对一关系
+    portrait = relationship("UserPortrait", back_populates="recommendations")
+    # 关系：与体检套餐表的多对一关系
+    package = relationship("ExaminationPackage", back_populates="recommendations")
 
 
 class UserHealthProfile(Base):

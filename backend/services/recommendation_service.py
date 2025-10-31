@@ -1,10 +1,11 @@
 from sqlalchemy.orm import Session
 from datetime import datetime
+from typing import List
 import logging
 import random
 
 from models import User, UserProfile, HealthInfo, MedicalReport, UserPortrait, \
-                     ExaminationItem, RecommendedPackage, PackageItem
+                     ExaminationItem, RecommendedPackage, PackageItem, Recommendation, ExaminationPackage
 from utils.error_handler import CustomException, handle_database_error, log_error, db_transaction
 
 logger = logging.getLogger("app.services.recommendation")
@@ -231,6 +232,118 @@ async def get_examination_items(
         )
 
 # 这个函数在health_info_service.py中也有，为了避免循环导入，这里也定义一下
+async def create_recommendation(
+    db: Session,
+    user_id: int,
+    portraits_id: int,
+    recommended_package_id: int,
+    recommendation_reason: str = None
+) -> Recommendation:
+    """
+    创建推荐记录
+    :param db: 数据库会话
+    :param user_id: 用户ID
+    :param portraits_id: 用户画像ID
+    :param recommended_package_id: 推荐套餐ID
+    :param recommendation_reason: 推荐理由
+    :return: 创建的推荐记录
+    """
+    try:
+        # 检查用户是否存在
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise CustomException(
+                status_code=404,
+                message="用户不存在",
+                error_type="UserNotFound"
+            )
+            
+        # 检查用户画像是否存在
+        user_portrait = db.query(UserPortrait).filter(UserPortrait.id == portraits_id).first()
+        if not user_portrait:
+            raise CustomException(
+                status_code=404,
+                message="用户画像不存在",
+                error_type="UserPortraitNotFound"
+            )
+            
+        # 检查推荐套餐是否存在
+        package = db.query(ExaminationPackage).filter(ExaminationPackage.id == recommended_package_id).first()
+        if not package:
+            raise CustomException(
+                status_code=404,
+                message="推荐套餐不存在",
+                error_type="PackageNotFound"
+            )
+        
+        # 创建推荐记录
+        recommendation = Recommendation(
+            user_id=user_id,
+            portraits_id=portraits_id,
+            recommended_package_id=recommended_package_id,
+            recommendation_reason=recommendation_reason,
+            recommended_at=datetime.now()
+        )
+        
+        db.add(recommendation)
+        db.commit()
+        db.refresh(recommendation)
+        
+        logger.info(f"创建推荐记录: 用户ID={user_id}, 画像ID={portraits_id}, 套餐ID={recommended_package_id}")
+        return recommendation
+        
+    except CustomException as e:
+        raise
+    except Exception as e:
+        handle_database_error(db, e)
+        log_error("CreateRecommendationError", f"创建推荐记录失败: {str(e)}", exc_info=True)
+        raise CustomException(
+            status_code=500,
+            message="创建推荐记录失败，请稍后重试",
+            error_type="RecommendationCreationError"
+        )
+
+async def get_user_recommendations(
+    db: Session,
+    user_id: int,
+    skip: int = 0,
+    limit: int = 100
+) -> List[Recommendation]:
+    """
+    获取用户的推荐记录
+    :param db: 数据库会话
+    :param user_id: 用户ID
+    :param skip: 跳过的记录数
+    :param limit: 返回的最大记录数
+    :return: 推荐记录列表
+    """
+    try:
+        # 检查用户是否存在
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise CustomException(
+                status_code=404,
+                message="用户不存在",
+                error_type="UserNotFound"
+            )
+        
+        # 获取推荐记录
+        recommendations = db.query(Recommendation).filter(
+            Recommendation.user_id == user_id
+        ).order_by(Recommendation.recommended_at.desc()).offset(skip).limit(limit).all()
+        
+        return recommendations
+        
+    except CustomException as e:
+        raise
+    except Exception as e:
+        log_error("GetUserRecommendationsError", f"获取用户推荐记录失败: {str(e)}", exc_info=True)
+        raise CustomException(
+            status_code=500,
+            message="获取用户推荐记录失败，请稍后重试",
+            error_type="GetUserRecommendationsError"
+        )
+
 async def generate_user_portrait(
     db: Session,
     user_id: int

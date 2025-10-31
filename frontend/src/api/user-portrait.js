@@ -68,8 +68,12 @@ export const getFlowStatus = async () => {
  * 获取用户画像信息
  */
 export const getUserPortrait = async () => {
-  const response = await request.get('/api/v1/user-portrait/info')
-  return response.data
+  const response = await request.get('/api/v1/user-profile/')
+  // 处理后端返回的数据结构
+  if (response.data && response.data.status === 'success') {
+    return response.data.data
+  }
+  return response.data || response
 }
 
 /**
@@ -85,6 +89,6 @@ export const getUserSymptoms = async () => {
  * @param {Object} data - 更新的数据
  */
 export const updateUserPortrait = async (data) => {
-  const response = await request.put('/api/v1/user-portrait/info', data)
+  const response = await request.put('/api/v1/user-profile/', data)
   return response.data
 }

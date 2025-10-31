@@ -14,6 +14,15 @@ class UserPortrait(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     
+    # 健康风险评估
+    health_risk = Column(String(20), nullable=True)  # 健康风险评估等级
+    
+    # 推荐体检频率
+    recommended_frequency = Column(String(50), nullable=True)  # 推荐体检频率
+    
+    # 画像生成时间
+    generated_at = Column(DateTime, nullable=True)  # 画像生成时间
+    
     # 基本信息
     basic_info = Column(JSON, nullable=True)  # 存储基本信息，如姓名、年龄、性别等
     
@@ -38,6 +47,8 @@ class UserPortrait(Base):
     
     # 关联用户
     user = relationship("User", back_populates="user_portrait")
+    # 关联推荐记录
+    recommendations = relationship("Recommendation", back_populates="portrait")
 
 
 class SymptomKnowledge(Base):

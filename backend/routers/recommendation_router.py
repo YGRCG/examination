@@ -1,15 +1,15 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Body
 from sqlalchemy.orm import Session
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 from utils.database import get_db
 from utils.security import get_current_user
 from services import recommendation_service
 from schemas import user_schemas
-from utils.error_handler import handle_exceptions
+from utils.error_handler import handle_exceptions, CustomException
 
 router = APIRouter(
-    prefix="/api/v1/recommendations",
+    prefix="/recommendations",
     tags=["智能推荐"]
 )
 
@@ -151,5 +151,96 @@ async def get_examination_items(
             "total": len(response_data),
             "limit": limit,
             "offset": offset
+        }
+    )
+
+@router.post("/create", response_model=user_schemas.ApiResponse)
+@handle_exceptions
+async def create_recommendation(
+    request: Dict[str, Any] = Body(...),
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    创建推荐记录接口
+    - **portraits_id**: 用户画像ID
+    - **recommended_package_id**: 推荐套餐ID
+    - **recommendation_reason**: 推荐理由（可选）
+    """
+    # 验证请求参数
+    portraits_id = request.get("portraits_id")
+    recommended_package_id = request.get("recommended_package_id")
+    recommendation_reason = request.get("recommendation_reason")
+    
+    if not portraits_id or not recommended_package_id:
+        raise CustomException(
+            status_code=400,
+            message="用户画像ID和推荐套餐ID不能为空",
+            error_type="InvalidParameters"
+        )
+    
+    # 创建推荐记录
+    recommendation = await recommendation_service.create_recommendation(
+        db, current_user.id, portraits_id, recommended_package_id, recommendation_reason
+    )
+    
+    # 构造响应数据
+    response_data = {
+        "id": recommendation.id,
+        "user_id": recommendation.user_id,
+        "portraits_id": recommendation.portraits_id,
+        "recommended_package_id": recommendation.recommended_package_id,
+        "recommendation_reason": recommendation.recommendation_reason,
+        "recommended_at": recommendation.recommended_at,
+        "created_at": recommendation.created_at,
+        "updated_at": recommendation.updated_at
+    }
+    
+    return user_schemas.ApiResponse(
+        status="success",
+        message="创建推荐记录成功",
+        data=response_data
+    )
+
+@router.get("/list", response_model=user_schemas.ApiResponse)
+@handle_exceptions
+async def get_user_recommendations(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """
+    获取用户推荐记录列表接口
+    - **skip**: 跳过的记录数，默认0
+    - **limit**: 返回的最大记录数，默认100
+    """
+    # 获取用户推荐记录
+    recommendations = await recommendation_service.get_user_recommendations(
+        db, current_user.id, skip, limit
+    )
+    
+    # 构造响应数据
+    response_data = []
+    for recommendation in recommendations:
+        response_data.append({
+            "id": recommendation.id,
+            "user_id": recommendation.user_id,
+            "portraits_id": recommendation.portraits_id,
+            "recommended_package_id": recommendation.recommended_package_id,
+            "recommendation_reason": recommendation.recommendation_reason,
+            "recommended_at": recommendation.recommended_at,
+            "created_at": recommendation.created_at,
+            "updated_at": recommendation.updated_at
+        })
+    
+    return user_schemas.ApiResponse(
+        status="success",
+        message="获取用户推荐记录成功",
+        data={
+            "recommendations": response_data,
+            "total": len(response_data),
+            "skip": skip,
+            "limit": limit
         }
     )

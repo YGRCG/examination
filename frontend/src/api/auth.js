@@ -52,7 +52,7 @@ export const login = async (username, password) => {
     formData.append('username', username)
     formData.append('password', password)
     
-    const response = await fetch('/api/auth/token', {
+    const response = await fetch('/api/v1/auth/token', {
       method: 'POST',
       body: formData
     })

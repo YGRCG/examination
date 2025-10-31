@@ -25,6 +25,7 @@ from routers.report_router import router as report_router
 from routers.interpretation_router import router as interpretation_router
 from routers.admin_router import router as admin_router
 from routers.user_profile_router import router as user_profile_router
+from routers.ai_router import router as ai_router
 from api.v1.user_portrait_router import router as user_portrait_router
 
 # 加载环境变量
@@ -85,6 +86,8 @@ app.include_router(admin_router, prefix=API_V1_PREFIX, tags=["系统管理"])
 app.include_router(user_profile_router, prefix=API_V1_PREFIX, tags=["用户画像"])
 # 注册用户画像路由
 app.include_router(user_portrait_router, prefix=API_V1_PREFIX, tags=["用户画像"])
+# 注册AI智能交互路由
+app.include_router(ai_router, prefix=API_V1_PREFIX, tags=["AI智能交互"])
 
 
 @app.on_event("startup")
@@ -148,7 +151,8 @@ def health_check(db: Session = Depends(get_db)):
     """
     try:
         # 执行简单的数据库查询来验证连接
-        db.execute("SELECT 1")
+        from sqlalchemy import text
+        db.execute(text("SELECT 1"))
         return {
             "status": "success",
             "message": "应用健康运行中",

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Float, JSON, text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -100,3 +100,22 @@ class ExaminationResult(Base):
     
     # 关系：与体检记录表的多对一关系
     record = relationship("ExaminationRecord", back_populates="results")
+
+
+class ExaminationPackage(Base):
+    """
+    体检套餐表模型
+    """
+    __tablename__ = "examination_packages"
+    
+    id = Column(Integer, primary_key=True, index=True, comment="套餐ID")
+    name = Column(String(100), nullable=False, comment="套餐名称")
+    description = Column(String(1000), nullable=True, comment="套餐描述")
+    price = Column(Float, nullable=False, comment="套餐价格")
+    target_group = Column(String(100), nullable=True, comment="目标人群")
+    recommended_frequency = Column(String(50), nullable=True, comment="推荐频率")
+    created_at = Column(DateTime, server_default=text('CURRENT_TIMESTAMP'), nullable=True, comment="创建时间")
+    updated_at = Column(DateTime, server_default=text('CURRENT_TIMESTAMP'), nullable=True, comment="更新时间")
+    
+    # 关系：一个套餐可以有多个推荐记录
+    recommendations = relationship("Recommendation", back_populates="package")

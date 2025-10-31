@@ -10,14 +10,14 @@
       <div v-else-if="portraitData" class="result-container">
         <div class="result-header">
           <div class="user-info">
-            <h2>{{ portraitData.name || '用户' }}</h2>
-            <p>{{ portraitData.age }}岁 | {{ portraitData.gender === 'male' ? '男' : '女' }}</p>
+            <h2>{{ portraitData.basic_info?.name || '用户' }}</h2>
+            <p>{{ portraitData.basic_info?.age || '未知' }}岁 | {{ portraitData.basic_info?.gender || '未知' }}</p>
           </div>
           <div class="health-rating">
-            <div class="rating-badge" :class="getRatingClass(portraitData.health_risk)">
-              {{ getRatingText(portraitData.health_risk) }}
+            <div class="rating-badge" :class="getRatingClass(portraitData.healthScore)">
+              {{ getRatingText(portraitData.healthScore) }}
             </div>
-            <p>建议检查频率：{{ portraitData.recommended_frequency }}</p>
+            <p>健康评分：{{ portraitData.healthScore || '未知' }}/100</p>
           </div>
         </div>
 
@@ -42,10 +42,11 @@
             <h3><i class="el-icon-notebook-2"></i> 主要症状分析</h3>
             <div class="symptoms-list">
               <div v-for="(symptom, index) in portraitData.symptoms" :key="index" class="symptom-card">
-                <h4>{{ symptom.name }}</h4>
+                <h4>{{ symptom.name || symptom.symptom }}</h4>
                 <div class="symptom-details">
-                  <p><strong>频率：</strong>{{ symptom.frequency }}</p>
+                  <p v-if="symptom.frequency"><strong>频率：</strong>{{ symptom.frequency }}</p>
                   <p v-if="symptom.details"><strong>详情：</strong>{{ symptom.details }}</p>
+                  <p v-if="symptom.severity"><strong>严重程度：</strong>{{ symptom.severity }}</p>
                 </div>
               </div>
             </div>
@@ -80,7 +81,7 @@
             <div class="recommendations">
               <div v-for="(recommendation, index) in healthRecommendations" :key="index" class="recommendation-item">
                 <i class="el-icon-check"></i>
-                <p>{{ recommendation }}</p>
+                <p>{{ recommendation.description || recommendation }}</p>
               </div>
             </div>
           </div>
@@ -90,7 +91,7 @@
             <h3><i class="el-icon-document"></i> 推荐检查项目</h3>
             <div class="recommended-exams">
               <div v-for="(exam, index) in recommendedExams" :key="index" class="exam-tag">
-                {{ exam }}
+                {{ exam.name || exam }}
               </div>
             </div>
           </div>
@@ -189,13 +190,317 @@ export default {
       try {
         const data = await getUserPortrait()
         portraitData.value = data
-        // 这里可以根据实际返回的数据更新风险指标等信息
+        
+        // 根据实际返回的数据更新风险指标等信息
+        if (data && data.basic_info) {
+          // 根据基本信息计算BMI和健康风险
+          if (data.basic_info.height && data.basic_info.weight) {
+            const bmi = data.basic_info.weight / Math.pow(data.basic_info.height / 100, 2)
+            let bmiRisk = 0
+            if (bmi < 18.5) bmiRisk = 30
+            else if (bmi < 24) bmiRisk = 10
+            else if (bmi < 28) bmiRisk = 50
+            else bmiRisk = 80
+            
+            // 更新BMI风险指标
+            const bmiIndex = riskIndicators.value.findIndex(item => item.name === 'BMI指数')
+            if (bmiIndex !== -1) {
+              riskIndicators.value[bmiIndex].value = bmiRisk
+            }
+          }
+          
+          // 根据年龄计算健康风险
+          if (data.basic_info.age) {
+            let ageRisk = 0
+            if (data.basic_info.age < 30) ageRisk = 10
+            else if (data.basic_info.age < 45) ageRisk = 20
+            else if (data.basic_info.age < 60) ageRisk = 40
+            else ageRisk = 60
+            
+            // 更新年龄风险指标
+            const ageIndex = riskIndicators.value.findIndex(item => item.name === '年龄因素')
+            if (ageIndex !== -1) {
+              riskIndicators.value[ageIndex].value = ageRisk
+            }
+          }
+        }
+        
+        // 处理健康历史数据
+        if (data && data.health_history) {
+          let healthRisk = 0
+          if (data.health_history.chronic_diseases) {
+            healthRisk += 30
+          }
+          if (data.health_history.allergies) {
+            healthRisk += 10
+          }
+          
+          // 更新健康历史风险指标
+          const healthIndex = riskIndicators.value.findIndex(item => item.name === '健康历史')
+          if (healthIndex !== -1) {
+            riskIndicators.value[healthIndex].value = Math.min(healthRisk, 100)
+          }
+        }
+        
+        // 处理生活习惯数据
+        if (data && data.lifestyle) {
+          let lifestyleRisk = 0
+          if (data.lifestyle.smoking_status === '吸烟') {
+            lifestyleRisk += 40
+          }
+          if (data.lifestyle.drinking_status === '饮酒') {
+            lifestyleRisk += 20
+          }
+          if (data.lifestyle.exercise_habits === '很少运动') {
+            lifestyleRisk += 30
+          }
+          if (data.lifestyle.sleep_quality === '差') {
+            lifestyleRisk += 20
+          }
+          
+          // 更新生活习惯风险指标
+          const lifestyleIndex = riskIndicators.value.findIndex(item => item.name === '生活习惯')
+          if (lifestyleIndex !== -1) {
+            riskIndicators.value[lifestyleIndex].value = Math.min(lifestyleRisk, 100)
+          }
+        }
+        
+        // 处理症状数据
+        if (data && data.symptoms && data.symptoms.length > 0) {
+          // 根据症状数量和严重程度计算风险
+          let symptomRisk = Math.min(data.symptoms.length * 15, 70)
+          
+          // 更新症状风险指标
+          const symptomIndex = riskIndicators.value.findIndex(item => item.name === '当前症状')
+          if (symptomIndex !== -1) {
+            riskIndicators.value[symptomIndex].value = symptomRisk
+          }
+        }
+        
+        // 计算总体健康评分
+        const totalRisk = riskIndicators.value.reduce((sum, item) => sum + item.value, 0) / riskIndicators.value.length
+        portraitData.value.healthScore = Math.round(100 - totalRisk)
+        
+        // 根据风险指标生成健康建议
+        generateHealthRecommendations(data)
+        
+        // 根据风险指标生成推荐体检项目
+        generateRecommendedExams(data)
+        
       } catch (error) {
         console.error('获取画像数据失败:', error)
         ElMessage.error('获取画像数据失败，请稍后重试')
       } finally {
         loading.value = false
       }
+    }
+    
+    const generateHealthRecommendations = (data) => {
+      const recommendations = []
+      
+      // 基于风险指标生成建议
+      riskIndicators.value.forEach(indicator => {
+        if (indicator.value >= 70) {
+          if (indicator.name === 'BMI指数') {
+            recommendations.push({
+              title: '体重管理',
+              description: '您的BMI指数偏高，建议咨询营养师制定合理的饮食计划，并增加有氧运动。',
+              priority: 'high'
+            })
+          } else if (indicator.name === '生活习惯') {
+            recommendations.push({
+              title: '改善生活习惯',
+              description: '您的生活习惯可能对健康造成负面影响，建议戒烟限酒，增加运动，改善睡眠质量。',
+              priority: 'high'
+            })
+          } else if (indicator.name === '健康历史') {
+            recommendations.push({
+              title: '定期复查',
+              description: '基于您的健康历史，建议定期进行相关检查，并遵医嘱进行治疗。',
+              priority: 'high'
+            })
+          } else if (indicator.name === '当前症状') {
+            recommendations.push({
+              title: '症状管理',
+              description: '您的当前症状需要及时关注，建议尽快就医进行详细检查。',
+              priority: 'high'
+            })
+          }
+        } else if (indicator.value >= 40) {
+          if (indicator.name === 'BMI指数') {
+            recommendations.push({
+              title: '体重监测',
+              description: '您的BMI指数接近正常范围上限，建议注意饮食平衡，保持适量运动。',
+              priority: 'medium'
+            })
+          } else if (indicator.name === '生活习惯') {
+            recommendations.push({
+              title: '健康生活方式',
+              description: '建议保持健康的生活方式，适量运动，保证充足睡眠。',
+              priority: 'medium'
+            })
+          }
+        }
+      })
+      
+      // 基于具体数据生成建议
+      if (data && data.lifestyle) {
+        if (data.lifestyle.smoking_status === '吸烟') {
+          recommendations.push({
+            title: '戒烟建议',
+            description: '吸烟是多种疾病的风险因素，建议您制定戒烟计划，可寻求专业医疗帮助。',
+            priority: 'high'
+          })
+        }
+        if (data.lifestyle.drinking_status === '饮酒') {
+          recommendations.push({
+            title: '限酒建议',
+            description: '过量饮酒会对肝脏等器官造成损害，建议控制饮酒量或戒酒。',
+            priority: 'medium'
+          })
+        }
+      }
+      
+      // 更新健康建议
+      healthRecommendations.value = recommendations
+    }
+    
+    const generateRecommendedExams = (data) => {
+      const exams = []
+      
+      // 基于年龄推荐基础体检项目
+      if (data && data.basic_info && data.basic_info.age) {
+        const age = data.basic_info.age
+        if (age >= 30) {
+          exams.push({
+            name: '血常规',
+            reason: '基础健康指标检查',
+            category: '基础检查'
+          })
+          exams.push({
+            name: '肝功能',
+            reason: '肝脏健康指标检查',
+            category: '基础检查'
+          })
+          exams.push({
+            name: '肾功能',
+            reason: '肾脏健康指标检查',
+            category: '基础检查'
+          })
+        }
+        if (age >= 40) {
+          exams.push({
+            name: '血脂四项',
+            reason: '心血管疾病风险评估',
+            category: '心血管检查'
+          })
+          exams.push({
+            name: '血糖',
+            reason: '糖尿病筛查',
+            category: '代谢检查'
+          })
+        }
+        if (age >= 50) {
+          exams.push({
+            name: '肿瘤标志物',
+            reason: '肿瘤早期筛查',
+            category: '肿瘤筛查'
+          })
+        }
+      }
+      
+      // 基于性别推荐特定检查
+      if (data && data.basic_info && data.basic_info.gender) {
+        if (data.basic_info.gender === '男' && data.basic_info.age >= 40) {
+          exams.push({
+            name: '前列腺特异抗原(PSA)',
+            reason: '前列腺健康检查',
+            category: '专科检查'
+          })
+        } else if (data.basic_info.gender === '女' && data.basic_info.age >= 30) {
+          exams.push({
+            name: '宫颈涂片',
+            reason: '宫颈癌筛查',
+            category: '专科检查'
+          })
+          if (data.basic_info.age >= 40) {
+            exams.push({
+              name: '乳腺钼靶',
+              reason: '乳腺癌筛查',
+              category: '专科检查'
+            })
+          }
+        }
+      }
+      
+      // 基于健康历史推荐特定检查
+      if (data && data.health_history) {
+        if (data.health_history.family_medical_history && 
+            data.health_history.family_medical_history.includes('心血管疾病')) {
+          exams.push({
+            name: '心电图',
+            reason: '心血管疾病风险评估',
+            category: '心血管检查'
+          })
+          exams.push({
+            name: '心脏超声',
+            reason: '心脏结构和功能检查',
+            category: '心血管检查'
+          })
+        }
+      }
+      
+      // 基于生活习惯推荐特定检查
+      if (data && data.lifestyle) {
+        if (data.lifestyle.smoking_status === '吸烟') {
+          exams.push({
+            name: '胸部X光/CT',
+            reason: '肺部健康检查',
+            category: '呼吸系统检查'
+          })
+        }
+        if (data.lifestyle.drinking_status === '饮酒') {
+          exams.push({
+            name: '腹部超声',
+            reason: '肝脏健康检查',
+            category: '消化系统检查'
+          })
+        }
+      }
+      
+      // 基于症状推荐特定检查
+      if (data && data.symptoms && data.symptoms.length > 0) {
+        data.symptoms.forEach(symptom => {
+          if (symptom.symptom.includes('胸') || symptom.symptom.includes('心')) {
+            exams.push({
+              name: '心电图',
+              reason: '心脏相关症状检查',
+              category: '心血管检查'
+            })
+          }
+          if (symptom.symptom.includes('腹') || symptom.symptom.includes('胃')) {
+            exams.push({
+              name: '腹部超声',
+              reason: '腹部症状检查',
+              category: '消化系统检查'
+            })
+          }
+        })
+      }
+      
+      // 去重并限制数量
+      const uniqueExams = []
+      const examNames = new Set()
+      
+      for (const exam of exams) {
+        if (!examNames.has(exam.name)) {
+          examNames.add(exam.name)
+          uniqueExams.push(exam)
+        }
+      }
+      
+      // 更新推荐体检项目
+      recommendedExams.value = uniqueExams.slice(0, 8)
     }
 
     const goToAppointment = () => {

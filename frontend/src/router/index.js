@@ -46,14 +46,15 @@ const routes = [
     }
   },
   {
-    path: '/information',
-    name: 'information',
-    component: () => import('../views/InformationCollectionView.vue'),
+    path: '/smart-interaction',
+    name: 'smartInteraction',
+    component: () => import('../views/SmartInteractionView.vue'),
     meta: {
-      title: '信息收集 - 医院体检项目智能推荐系统',
+      title: '智能交互 - 医院体检项目智能推荐系统',
       requiresAuth: true
     }
   },
+
   {
     path: '/recommendations',
     name: 'recommendations',

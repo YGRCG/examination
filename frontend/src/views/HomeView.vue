@@ -64,12 +64,17 @@ const router = useRouter()
 // 导航到智能交互页面
 const startRecommendation = () => {
   // 检查是否已登录
-  if (localStorage.getItem('token')) {
-    router.push('/chat')
+  const token = localStorage.getItem('token')
+  console.log('检查登录状态，token:', token)
+  
+  if (token) {
+    console.log('用户已登录，直接跳转到智能交互页面')
+    router.push('/smart-interaction')
   } else {
+    console.log('用户未登录，跳转到登录页面')
     router.push({
       name: 'login',
-      query: { redirect: '/chat' }
+      query: { redirect: '/smart-interaction' }
     })
   }
 }

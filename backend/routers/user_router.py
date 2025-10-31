@@ -10,7 +10,7 @@ from utils.security import create_access_token, get_current_user, ACCESS_TOKEN_E
 from utils.error_handler import handle_exceptions
 
 router = APIRouter(
-    prefix="/api/v1/auth",
+    prefix="/auth",
     tags=["用户管理"],
 )
 
@@ -34,7 +34,7 @@ async def register_user(user_data: user_schemas.UserCreate, db: Session = Depend
     return user_schemas.ApiResponse(
         status="success",
         message="用户注册成功",
-        data=user_response
+        data=user_response.model_dump()
     )
 
 @router.post("/login", response_model=user_schemas.ApiResponse)
@@ -123,7 +123,7 @@ async def get_user_profile(current_user = Depends(get_current_user)):
     return user_schemas.ApiResponse(
         status="success",
         message="获取用户信息成功",
-        data=user_response
+        data=user_response.model_dump()
     )
 
 @router.put("/profile", response_model=user_schemas.ApiResponse)
@@ -149,5 +149,5 @@ async def update_user_profile(
     return user_schemas.ApiResponse(
         status="success",
         message="用户信息更新成功",
-        data=user_response
+        data=user_response.model_dump()
     )

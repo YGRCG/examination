@@ -249,11 +249,11 @@ class UserProfileResponse(BaseModel):
     """用户画像响应模型"""
     user_id: int
     basic_info: Optional[Dict[str, Any]] = None
-    health_history: Optional[Dict[str, Any]] = None
+    health_history: Optional[List[Dict[str, Any]]] = None
     lifestyle: Optional[Dict[str, Any]] = None
     symptoms: Optional[List[Dict[str, Any]]] = None
     medical_reports: Optional[List[Dict[str, Any]]] = None
-    focus_areas: Optional[List[str]] = None
+    focus_areas: Optional[List[Dict[str, Any]]] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     

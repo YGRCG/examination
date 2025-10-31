@@ -3,7 +3,7 @@ import { ElMessage } from 'element-plus'
 
 // 创建axios实例
 const service = axios.create({
-  baseURL: '/api', // 使用Vite代理
+  baseURL: '', // 移除baseURL，直接使用相对路径
   timeout: 10000 // 请求超时时间
 })
 
