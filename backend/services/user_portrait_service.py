@@ -323,10 +323,12 @@ class UserPortraitFlowService:
     
     def generate_final_user_portrait(self, session_data: Dict[str, Any]) -> UserPortrait:
         """基于收集的所有信息生成最终用户画像"""
-        # 获取基本信息
+        # 获取所有收集的数据，确保符合数据库表结构
         basic_info = session_data.get("basic_info", {})
         health_history = session_data.get("health_history", {})
         lifestyle = session_data.get("lifestyle", {})
+        symptoms = session_data.get("symptoms", [])
+        medical_reports = session_data.get("medical_reports", [])
         
         # 分析健康风险
         health_risk = "低风险"
@@ -353,6 +355,14 @@ class UserPortraitFlowService:
         if lifestyle.get("exercise_frequency") == "很少":
             risk_factors.append("缺乏运动")
         
+        # 症状因素
+        if symptoms and len(symptoms) > 0:
+            risk_factors.append(f"有{len(symptoms)}个不适症状")
+        
+        # 体检报告因素
+        if medical_reports and len(medical_reports) > 0:
+            risk_factors.append("有历史体检报告")
+        
         # 根据风险因素确定风险等级
         if len(risk_factors) >= 3:
             health_risk = "高风险"
@@ -364,6 +374,9 @@ class UserPortraitFlowService:
         if health_risk == "高风险" or (age and age >= 50):
             recommended_frequency = "每半年一次"
         
+        # 生成重点关注领域
+        focus_areas = self._generate_focus_areas(basic_info, health_history, lifestyle, symptoms, medical_reports)
+        
         # 创建或更新用户画像
         user_portrait = self.db.query(UserPortrait).filter(
             UserPortrait.user_id == self.user_id
@@ -373,6 +386,9 @@ class UserPortraitFlowService:
             user_portrait.basic_info = basic_info
             user_portrait.health_history = health_history
             user_portrait.lifestyle = lifestyle
+            user_portrait.symptoms = symptoms
+            user_portrait.medical_reports = medical_reports
+            user_portrait.focus_areas = focus_areas
             user_portrait.health_risk = health_risk
             user_portrait.recommended_frequency = recommended_frequency
             user_portrait.generated_at = datetime.now()
@@ -382,6 +398,9 @@ class UserPortraitFlowService:
                 basic_info=basic_info,
                 health_history=health_history,
                 lifestyle=lifestyle,
+                symptoms=symptoms,
+                medical_reports=medical_reports,
+                focus_areas=focus_areas,
                 health_risk=health_risk,
                 recommended_frequency=recommended_frequency,
                 generated_at=datetime.now()
@@ -391,8 +410,86 @@ class UserPortraitFlowService:
         self.db.commit()
         self.db.refresh(user_portrait)
         
-        logger.info(f"生成用户画像: 用户ID={self.user_id}, 健康风险={health_risk}")
+        logger.info(f"生成用户画像: 用户ID={self.user_id}, 健康风险={health_risk}, 关注领域={len(focus_areas)}个")
         return user_portrait
+    
+    def _generate_focus_areas(self, basic_info: Dict[str, Any], health_history: Dict[str, Any], 
+                            lifestyle: Dict[str, Any], symptoms: List[Dict[str, Any]], 
+                            medical_reports: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """生成用户重点关注领域"""
+        focus_areas = []
+        
+        # 基于基本信息生成关注领域
+        age = basic_info.get("age")
+        if age and age >= 40:
+            focus_areas.append({
+                "area_name": "中年健康管理",
+                "reason": "年龄超过40岁，需要关注中年期健康问题",
+                "priority": "high"
+            })
+        
+        # 基于健康史生成关注领域
+        if health_history.get("chronic_diseases"):
+            focus_areas.append({
+                "area_name": "慢性病管理",
+                "reason": "有慢性疾病史，需要定期监测和管理",
+                "priority": "high"
+            })
+        
+        if health_history.get("family_medical_history"):
+            focus_areas.append({
+                "area_name": "遗传风险监测",
+                "reason": "有家族病史，需要关注相关疾病风险",
+                "priority": "medium"
+            })
+        
+        # 基于生活习惯生成关注领域
+        if lifestyle.get("smoking", False):
+            focus_areas.append({
+                "area_name": "戒烟指导",
+                "reason": "吸烟习惯对健康有显著影响",
+                "priority": "high"
+            })
+        
+        if lifestyle.get("alcohol", False):
+            focus_areas.append({
+                "area_name": "饮酒管理",
+                "reason": "饮酒习惯需要合理控制",
+                "priority": "medium"
+            })
+        
+        if lifestyle.get("exercise_frequency") == "很少":
+            focus_areas.append({
+                "area_name": "运动指导",
+                "reason": "缺乏运动，需要建立运动习惯",
+                "priority": "medium"
+            })
+        
+        # 基于症状生成关注领域
+        if symptoms and len(symptoms) > 0:
+            focus_areas.append({
+                "area_name": "症状管理",
+                "reason": f"有{len(symptoms)}个不适症状需要关注",
+                "priority": "high"
+            })
+        
+        # 基于体检报告生成关注领域
+        if medical_reports and len(medical_reports) > 0:
+            focus_areas.append({
+                "area_name": "体检报告解读",
+                "reason": "有历史体检报告需要专业解读",
+                "priority": "medium"
+            })
+        
+        # 如果没有特定关注领域，添加基础健康管理
+        if not focus_areas:
+            focus_areas.append({
+                "area_name": "基础健康管理",
+                "reason": "保持良好生活习惯，定期体检",
+                "priority": "low"
+            })
+        
+        return focus_areas
     
     def skip_step(self, step: str) -> Dict[str, Any]:
         """跳过当前步骤"""

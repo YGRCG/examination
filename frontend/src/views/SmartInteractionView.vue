@@ -9,6 +9,9 @@
         <h2>健康助手</h2>
       </div>
       <div class="header-right">
+        <button class="end-btn" @click="endInteraction" :disabled="isAssistantTyping">
+          结束交互
+        </button>
       </div>
     </header>
 
@@ -60,6 +63,19 @@
 
     <!-- 输入区域 -->
     <footer class="chat-input-area">
+      <!-- 快捷回复按钮 -->
+      <div v-if="currentQuickReplies.length > 0" class="quick-replies">
+        <button
+          v-for="reply in currentQuickReplies"
+          :key="reply"
+          class="quick-reply-btn"
+          @click="selectQuickReply(reply)"
+          :disabled="isAssistantTyping"
+        >
+          {{ reply }}
+        </button>
+      </div>
+      
       <div class="input-container">
         <input
           ref="inputRef"
@@ -224,33 +240,69 @@ const mainFlowSteps = [
 const symptomKnowledgeBase = {
   '头晕': {
     followUpQuestions: [
-      '请问是眩晕（感觉天旋地转）还是昏沉（感觉头重脚轻）？',
-      '这种情况持续多久了？',
-      '在什么情况下容易诱发（比如起床、转头时）？'
+      {
+        question: '请问是眩晕（感觉天旋地转）还是昏沉（感觉头重脚轻）？',
+        quickReplies: ['眩晕', '昏沉', '两者都有', '不确定']
+      },
+      {
+        question: '这种情况持续多久了？',
+        quickReplies: ['几天', '几周', '几个月', '超过半年']
+      },
+      {
+        question: '在什么情况下容易诱发（比如起床、转头时）？',
+        quickReplies: ['起床时', '转头时', '劳累后', '情绪激动时']
+      }
     ],
     entities: ['type', 'duration', 'triggers']
   },
   '胃痛': {
     followUpQuestions: [
-      '是胀痛、刺痛还是反酸？',
-      '通常是在饭前还是饭后出现？',
-      '是否伴有恶心、没胃口？'
+      {
+        question: '是胀痛、刺痛还是反酸？',
+        quickReplies: ['胀痛', '刺痛', '反酸', '烧灼痛']
+      },
+      {
+        question: '通常是在饭前还是饭后出现？',
+        quickReplies: ['饭前', '饭后', '空腹时', '饱腹时']
+      },
+      {
+        question: '是否伴有恶心、没胃口？',
+        quickReplies: ['有恶心', '没胃口', '两者都有', '没有']
+      }
     ],
     entities: ['pain_type', 'timing', 'accompanying_symptoms']
   },
   '胸闷': {
     followUpQuestions: [
-      '是持续性的还是间歇性的？',
-      '活动后会加重吗？',
-      '是否伴有呼吸困难？'
+      {
+        question: '是持续性的还是间歇性的？',
+        quickReplies: ['持续性', '间歇性', '偶尔', '频繁']
+      },
+      {
+        question: '活动后会加重吗？',
+        quickReplies: ['会加重', '不会加重', '轻微加重', '明显加重']
+      },
+      {
+        question: '是否伴有呼吸困难？',
+        quickReplies: ['有呼吸困难', '没有呼吸困难', '轻微呼吸困难', '严重呼吸困难']
+      }
     ],
     entities: ['pattern', 'exertion_relation', 'breathing_difficulty']
   },
   '疲劳': {
     followUpQuestions: [
-      '是身体疲劳还是精神疲劳？',
-      '这种情况持续多久了？',
-      '休息后能缓解吗？'
+      {
+        question: '是身体疲劳还是精神疲劳？',
+        quickReplies: ['身体疲劳', '精神疲劳', '两者都有', '不确定']
+      },
+      {
+        question: '这种情况持续多久了？',
+        quickReplies: ['几天', '几周', '几个月', '超过半年']
+      },
+      {
+        question: '休息后能缓解吗？',
+        quickReplies: ['能缓解', '不能缓解', '部分缓解', '不确定']
+      }
     ],
     entities: ['fatigue_type', 'duration', 'relief_by_rest']
   }
@@ -277,7 +329,7 @@ const canSkipCurrentStep = computed(() => {
 const currentQuickReplies = computed(() => {
   if (isDynamicSubProcess.value) {
     // AI动态子流程的快捷回复
-    return []
+    return dynamicSubProcessState.value.currentQuickReplies || []
   }
   
   if (currentStepConfig.value && subStepIndex.value < currentStepConfig.value.questions.length) {
@@ -332,23 +384,59 @@ const sendMessage = async () => {
   addMessage('user', messageText)
   userInput.value = ''
 
-  // 显示正在输入状态
-  isAssistantTyping.value = true
-
   try {
-    // 使用flowController处理用户回答
-    await flowController.processUserAnswer(messageText)
+    // 对于动态子流程特殊处理 - 等待用户回答的情况
+    if (isDynamicSubProcess.value && dynamicSubProcessState.value.waitingForAnswer) {
+      // 获取resolve函数并重置状态
+      const resolve = dynamicSubProcessState.value.resolveAnswer
+      dynamicSubProcessState.value.waitingForAnswer = false
+      dynamicSubProcessState.value.resolveAnswer = null
+      
+      // 确保输入框始终处于启用状态
+      isAssistantTyping.value = false
+      
+      // 确保UI更新完成
+      await nextTick()
+      
+      // 直接调用resolve，不再使用延时，让流程立即继续
+      resolve(messageText)
+      
+      // 重新聚焦到输入框
+      if (inputRef.value) {
+        inputRef.value.focus()
+      }
+      
+      // 提前返回，避免不必要的状态设置
+      return
+    } else {
+      // 非动态子流程正常处理
+      // 显示正在输入状态
+      isAssistantTyping.value = true
+      // 使用flowController处理用户回答
+      await flowController.processUserAnswer(messageText)
+    }
   } catch (error) {
     console.error('处理消息错误:', error)
     addMessage('assistant', '抱歉，处理您的回答时出现了问题，请稍后再试。')
   } finally {
-    isAssistantTyping.value = false
-    // 重新聚焦到输入框
-    nextTick(() => {
+    // 只有在非动态子流程中才重置状态
+    // 动态子流程的状态由waitForUserAnswer和相应的resolve逻辑单独管理
+    if (!isDynamicSubProcess.value) {
+      isAssistantTyping.value = false
+      // 重新聚焦到输入框
+      nextTick(() => {
+        if (inputRef.value) {
+          inputRef.value.focus()
+        }
+      })
+    } else {
+      // 动态子流程中确保输入框始终可用
+      isAssistantTyping.value = false
+      // 重新聚焦到输入框
       if (inputRef.value) {
         inputRef.value.focus()
       }
-    })
+    }
   }
 }
 
@@ -428,6 +516,31 @@ const getRecommendations = () => {
   router.push('/recommendations')
 }
 
+// 结束交互并跳转到用户画像分析界面
+const endInteraction = async () => {
+  try {
+    // 显示正在处理的消息
+    isAssistantTyping.value = true
+    
+    // 保存当前收集到的用户画像数据到数据库
+    await saveUserProfile()
+    
+    // 添加结束交互的消息
+    addMessage('assistant', '您已选择结束交互。系统将保存您已提供的信息并生成健康画像。')
+    
+    // 短暂延迟后跳转到用户画像分析界面
+    setTimeout(() => {
+      router.push('/portrait-result')
+    }, 1500)
+    
+  } catch (error) {
+    console.error('结束交互时出错:', error)
+    addMessage('assistant', '抱歉，结束交互时出现错误，请稍后再试。')
+  } finally {
+    isAssistantTyping.value = false
+  }
+}
+
 // 处理按钮点击事件
 const handleButtonClick = (action) => {
   if (action === 'viewProfile') {
@@ -443,7 +556,8 @@ const dynamicSubProcessState = ref({
   currentQuestionIndex: 0,
   symptomData: null,
   waitingForAnswer: false,
-  resolveAnswer: null
+  resolveAnswer: null,
+  currentQuickReplies: [] // 动态子流程的快速回复选项
 })
 
 // 状态机管理和流程控制逻辑
@@ -746,15 +860,6 @@ const flowController = {
   
   // 处理AI动态子流程回答
   async handleDynamicSubProcessAnswer(answer) {
-    // 如果正在等待回答，处理回答
-    if (dynamicSubProcessState.value.waitingForAnswer) {
-      dynamicSubProcessState.value.waitingForAnswer = false
-      const resolve = dynamicSubProcessState.value.resolveAnswer
-      dynamicSubProcessState.value.resolveAnswer = null
-      resolve(answer)
-      return
-    }
-    
     // 使用NLU提取症状实体
     const symptomEntity = await this.extractSymptomEntity(answer)
     
@@ -810,14 +915,24 @@ const flowController = {
   // 询问症状详细信息
   async askSymptomFollowUpQuestions(symptom, knowledge, symptomData) {
     for (let i = 0; i < knowledge.followUpQuestions.length; i++) {
-      const question = knowledge.followUpQuestions[i]
+      const questionData = knowledge.followUpQuestions[i]
+      const question = questionData.question
+      const quickReplies = questionData.quickReplies
       const entity = knowledge.entities[i]
       
+      // 发送问题
       addMessage('assistant', question)
       
+      // 如果有快速回复选项，设置动态子流程的快速回复
+      if (quickReplies && quickReplies.length > 0) {
+        dynamicSubProcessState.value.currentQuickReplies = quickReplies
+      }
+      
       // 等待用户回答
-      dynamicSubProcessState.value.waitingForAnswer = true
       const answer = await this.waitForUserAnswer()
+      
+      // 重置快速回复选项
+      dynamicSubProcessState.value.currentQuickReplies = []
       
       // 保存回答
       symptomData.details[entity] = answer
@@ -825,11 +940,16 @@ const flowController = {
     
     addMessage('assistant', `感谢您详细描述"${symptom}"的症状。还有其他不适吗？`)
     
+    // 设置结束症状询问的快速回复选项
+    dynamicSubProcessState.value.currentQuickReplies = ['没有其他不适', '还有其他不适']
+    
     // 检查是否还有其他症状
-    dynamicSubProcessState.value.waitingForAnswer = true
     const hasMoreSymptoms = await this.waitForUserAnswer()
     
-    if (hasMoreSymptoms.includes('没有') || hasMoreSymptoms.includes('不了') || hasMoreSymptoms.includes('完了')) {
+    // 重置快速回复选项
+    dynamicSubProcessState.value.currentQuickReplies = []
+    
+    if (hasMoreSymptoms.includes('没有') || hasMoreSymptoms.includes('不了') || hasMoreSymptoms.includes('完了') || hasMoreSymptoms.includes('没有其他不适')) {
       // 结束AI动态子流程，返回主流程
       isDynamicSubProcess.value = false
       if (!stateMachine.moveToNext()) {
@@ -875,7 +995,10 @@ const flowController = {
   // 等待用户回答
   waitForUserAnswer() {
     return new Promise((resolve) => {
+      dynamicSubProcessState.value.waitingForAnswer = true
       dynamicSubProcessState.value.resolveAnswer = resolve
+      // 确保在等待用户回答时，输入框和快速回复按钮可用
+      isAssistantTyping.value = false
     })
   }
 }
@@ -892,6 +1015,14 @@ const flowController = {
 
 // 组件初始化
 onMounted(() => {
+  // 检查登录状态
+  const token = localStorage.getItem('token')
+  if (!token) {
+    // 未登录，跳转到登录页面
+    router.push({ name: 'login', query: { redirect: '/smart-interaction' } })
+    return
+  }
+  
   // 初始化用户画像流程
   flowController.initialize()
   
@@ -989,6 +1120,30 @@ onMounted(() => {
 .skip-btn:hover {
   color: #409eff;
   border-color: #409eff;
+}
+
+.end-btn {
+  background-color: #67c23a;
+  color: white;
+  border: 1px solid #67c23a;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-weight: 500;
+}
+
+.end-btn:hover:not(:disabled) {
+  background-color: #85ce61;
+  border-color: #85ce61;
+}
+
+.end-btn:disabled {
+  background-color: #c0c4cc;
+  border-color: #c0c4cc;
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 /* 聊天消息区域 */
